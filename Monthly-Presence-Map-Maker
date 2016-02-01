@@ -1,0 +1,67 @@
+
+require("ggmap")
+require("qmap")
+require("ggplot2")
+#map library: it also exists!
+#https://www.nceas.ucsb.edu/~frazier/RSpatialGuides/ggmap/ggmapCheatsheet.pdf
+
+#Preprocessing
+Recorderpos <- read.csv(file.choose())
+
+Namesvec <- names(Recorderpos)
+Namesvec <- names(Recorderpos[5:length(Namesvec)])
+
+ActiveInactive <- Recorderpos 
+ActiveInactive[is.na(ActiveInactive) == FALSE] <- "Active"
+ActiveInactive[is.na(ActiveInactive)] <- "Inactive"
+
+RecorderNAs <- Recorderpos
+RecorderNAs[RecorderNAs != "NA"] <- 0
+RecorderNAs[is.na(RecorderNAs)] <- 5
+RecorderNAs[RecorderNAs == 0] <- NA
+RecorderNAs$OBJECTID <- Recorderpos$OBJECTID
+RecorderNAs$CH <- Recorderpos$CH
+RecorderNAs$Latitude_N <- Recorderpos$Latitude_N
+RecorderNAs$Longitude_W <- Recorderpos$Longitude_W
+RecorderNAs <- as.data.frame(RecorderNAs)
+
+map<-get_map(location=c(-70.404834,41.250462),zoom=8,source ="google",maptype='satellite',color=c("bw"))
+map1 <-ggmap(map)
+
+#Loop to make maps
+
+for(i in 1:27) {
+  mypath <- file.path("/Users/danielwoodrich/Desktop/Research Projects/Right whale migratory corridor project/WWU presentation/Plots for 20151123 presentation",paste(i,".jpg",sep=""))
+  
+  Detection_days_per_month <- as.vector(t(Recorderpos[i+4]))
+  Recording_status <- as.vector(t(ActiveInactive[i+4]))
+  Sizzzze <- as.vector(t(RecorderNAs[i+4]))
+  
+  Date_map1<-map1+geom_point(aes(x=Recorderpos$Longitude_W, y=Recorderpos$Latitude_N,size=Detection_days_per_month,colour=Recording_status,show_guide=FALSE),data=Recorderpos, alpha=.8,na.rm=TRUE) + scale_color_manual("Recording status",values=c("white","chocolate1")) + scale_size_continuous("Detection days per month", range=c(min(Detection_days_per_month,na.rm=TRUE),max(Detection_days_per_month,na.rm=TRUE))) 
+  
+  if (sum(is.na(Recorderpos[i+4])) !=9){
+    Date_map2<-Date_map1+geom_point(aes(x=Longitude_W, y=Latitude_N),colour='chocolate1',size=Sizzzze,data=RecorderNAs, shape=1, alpha=.9,na.rm=TRUE) + guides(colour = guide_legend(override.aes = list(size=4))) + theme(axis.title = element_blank()) + theme(legend.key=element_rect(fill='gray20')) + theme(legend.position = c(.83,.7)) + ggtitle(paste(Namesvec[i])) + theme(plot.title=element_text(family="Times", face="bold", size=25))
+  } else {
+    Date_map2<-map1+geom_point(aes(x=Longitude_W, y=Latitude_N),colour='chocolate1',size=Sizzzze,data=RecorderNAs, shape=1, alpha=.9,na.rm=TRUE) + guides(colour = guide_legend(override.aes = list(size=4))) + theme(axis.title = element_blank()) + theme(legend.key=element_rect(fill='gray20')) + theme(legend.position = c(.85,.7)) + ggtitle(paste(Namesvec[i])) +  theme(plot.title=element_text(family="Times", face="bold", size=25))
+  }
+  Date_map3<- Date_map2+geom_point(aes(x=Recorderpos$Longitude_W, y=Recorderpos$Latitude_N,size=Recorderpos$Mar_13,colour=Recording_status),data=Recorderpos, alpha=0,na.rm=TRUE) + guides(colour = guide_legend(override.aes = list(size=4,alpha=1))) + scale_color_manual("Recording status",values=c("white","chocolate1")) +theme(legend.key=element_rect(fill='gray20')) + scale_size_continuous(guide=guide_legend(override.aes=list(colour="white",alpha=.8)),"Detection days per month",range=range(0,20),limits = c(0, 21))       
+  jpeg(mypath,width=10,height=7.48,units="in",res=300)
+  print(Date_map3)
+  dev.off()
+}
+
+#map that shows recorder # 
+
+cmap<-get_map(location=c(-70.404834,41.250462),zoom=8,source ="google",maptype='hybrid',color="color")
+cmap1 <-ggmap(cmap)
+
+
+Coord_map1<-cmap1+geom_point(aes(x=Longitude_W, y=Latitude_N), color='purple',size=15, alpha = .7,data=Recorderpos,shape=1)
+Coord_map2 <- Coord_map1 + geom_point(aes(x=Longitude_W, y=Latitude_N), color='purple',size=15, alpha = .3,data=Recorderpos)
+Coord_map3 <- Coord_map2 + geom_text(data=Recorderpos,aes(x=Recorderpos$Longitude_W, y=Recorderpos$Latitude_N),label=Recorderpos$CH, color='white') + theme(axis.title = element_blank()) 
+
+mypathcoordmap <- file.path("/Users/danielwoodrich/Desktop/Research Projects/Right whale migratory corridor project/WWU presentation/Plots for 20151123 presentation","Coordmap.jpg")
+
+jpeg(mypathcoordmap,width=10,height=7.48,units="in",res=300)
+print(Coord_map3)
+dev.off()
