@@ -1,0 +1,423 @@
+#Daniel Woodrich
+#daniel.woodrich@noaa.gov
+#d.woodrich1@Gmail.com
+#July 24 2015
+
+#How to use
+
+#Make sure original excel sheets are saved as .csv, independently. Save them into the same working folder. Don't worry about: 
+#-Duplicate dates in two different sheets
+#-Lack of a CH column (datasets with only 1 recorder)
+#-Extra columns
+#-Ordering multiple sheets in chronological order
+#-Time gaps in sheets (script will automatically draw these as a light grey bar if they exist. To move the bar up and down, or change it's color, modify the numeric arguments and the col argument in the function rect, which is within the for loop in section 4)
+
+#Data sheets MUST include the following column names:
+#-Start_Date
+#-Manual_Review (presence = 1, absence = 0)
+#-CH *OR* MARU (recorder ID)
+
+#Aesthetics you will have to mess with:
+#cex arguments (size of font) can be modified in the "Makeplot" function (section 3), as well as in the axes that have to be added manually (section 5). For these manual axes, you can change the value of the argument "pos=" to scoot axis labels up and down. Muliple ploting window can be modified in section 4. 
+
+#Caution: the tick marks for month and year are calculated based on the size of the plotting window, which uses the function "Makeplot2". If you make changes to the argurments in "Makeplot" that might alter the size of the plotting window, reflect those changes in "Makeplot2". 
+
+#NOTE: If the timespan is <2 years, the small tickmarks will represent midweek days, and no tick marks will be drawn for years. If the timespan is >2 years, tick marks will not be drawn for the midweek days, and will be drawn for years. Tick marks / labels not showing up can be resolved by making the plotting window larger.
+
+#CHANGING TICK MARK LENGTHS: For weeks, change tck argument in "Makeplot" fxn in section 3. For months, add a tck argument to 1st axis function within "MakeplotAll" in section 3 and modify the value. For years, change tck argument in 2nd axis function within "MakeplotAll".
+
+##############SECTION1#####################
+#Input sheet name(s), and run one or the other. 
+
+#-----1 sheet-------------------------------------
+#Enter single sheet between the single quotation marks, such as:
+pamdata <- read.csv(file.choose())
+
+#OR
+
+#-----2 sheets -------------------------------------
+pamdata1 <- read.csv(file.choose())
+pamdata2 <- read.csv(file.choose())
+  
+pamdata <- rbind(pamdata1, pamdata2)
+
+#OR
+
+#--- 3 sheets ---------------------------------------
+#join multiple sheets: example here is of 3. What YOU need to do: save each sheet of the excel file(s) to the set source directory.
+
+pamdata1 <- read.csv(file.choose())
+pamdata2 <- read.csv(file.choose())
+pamdata3 <- read.csv(file.choose())
+
+pamdata12 <- rbind(pamdata1, pamdata2)
+pamdata <- rbind(pamdata12, pamdata3)
+
+#OR 
+#---------4 sheets ---------------------------------
+
+pamdata1 <- read.csv(file.choose())
+pamdata2 <- read.csv(file.choose())
+pamdata3 <- read.csv(file.choose())
+pamdata4 <- read.csv(file.choose())
+
+pamdata12 <- rbind(pamdata1, pamdata2)
+pamdata34 <- rbind(pamdata3, pamdata4)
+pamdata <- rbind(pamdata12, pamdata34)
+#--------------------------------------------
+##############SECTION2#####################
+#Run entire section
+
+#format the date into R recognizable date objects
+pamdata$formatdate <- as.Date(pamdata$Start_Date,format='%m/%d/%Y')
+
+#Preprocessing: Add some new columns
+pamdata$Month <- format(pamdata$formatdate,'%b')
+pamdata$Month <- as.character(pamdata$Month)
+pamdata$Season[pamdata$Month == "Mar"] <- "Spring"
+pamdata$Season[pamdata$Month == "Apr"] <- "Spring"
+pamdata$Season[pamdata$Month == "May"] <- "Spring"
+pamdata$Season[pamdata$Month == "Jun"] <- "Summer"
+pamdata$Season[pamdata$Month == "Jul"] <- "Summer"
+pamdata$Season[pamdata$Month == "Aug"] <- "Summer" 
+pamdata$Season[pamdata$Month == "Sep"] <- "Fall"
+pamdata$Season[pamdata$Month == "Oct"] <- "Fall"
+pamdata$Season[pamdata$Month == "Nov"] <- "Fall"
+pamdata$Season[pamdata$Month == "Dec"] <- "Winter" 
+pamdata$Season[pamdata$Month == "Jan"] <- "Winter"
+pamdata$Season[pamdata$Month == "Feb"] <- "Winter"
+
+pamdata$Month <- format(pamdata$formatdate,'%b')
+
+pamdata$Manual_Review <- as.character(pamdata$Manual_Review)
+pamdata$Suggested_Daily_Presence <- as.character(pamdata$Suggested_Daily_Presence)
+pamdata$True_Presence_Days1[pamdata$Manual_Review == "2"] <- "0"
+pamdata$True_Presence_Days1[pamdata$Manual_Review == "1"] <- "1"
+pamdata$True_Presence_Days1[pamdata$Manual_Review == "0"] <- "0"
+
+pamdata$True_Presence_Days1[pamdata$Manual_Review == ""] <- "0"
+pamdata$True_Presence_Days1[pamdata$Manual_Review == " "] <- "0"
+pamdata$True_Presence_Days2[pamdata$Suggested_Daily_Presence =="Yes"] <- "1"
+pamdata$True_Presence_Days2[pamdata$Suggested_Daily_Presence =="No"] <- "0"
+
+pamdata$True_Presence_Days2[pamdata$Suggested_Daily_Presence ==""] <- "0"
+pamdata$True_Presence_Days2[pamdata$Suggested_Daily_Presence ==" "] <- "0"
+
+pamdata$Manual_Review <- as.factor(pamdata$Manual_Review)
+pamdata$Suggested_Daily_Presence <-as.factor(pamdata$Suggested_Daily_Presence)
+pamdata$True_Presence_Days1 <- as.numeric(pamdata$True_Presence_Days1)
+pamdata$True_Presence_Days2 <- as.numeric(pamdata$True_Presence_Days2)
+
+pamdata$DaysAs1[pamdata$True_Presence_Days1 == "1"] <- "1"
+pamdata$DaysAs1[pamdata$True_Presence_Days1 == "0"] <- "1"
+pamdata$DaysAs1 <- as.numeric(pamdata$DaysAs1)
+
+pamdata$Season <- factor(pamdata$Season, levels = c("Winter","Spring","Summer","Fall"))
+
+#if the column on the data sheet designates recorders by MARU rather than CH, this renames MARU column. 
+if (!"CH" %in% names(pamdata))
+{names(pamdata)[names(pamdata)=="MARU"] <- "CH"}
+
+#if there is no column at all to designate recorders, assumes all data came from the same one, which it names "1"
+if (!"CH" %in% names(pamdata))
+{pamdata$CH <- 1}
+
+#################SECTION3##################
+#Run entire section
+
+#Parse pamdata by channel number
+
+ParseByChannel <- function(x) {
+  RECdata <- pamdata[pamdata$CH %in% x, ]
+  RECdata
+}
+
+#Create a vector that lists the start date of each week in the TOTAL time period (earliest and latest date from any MARU and sheet)
+WeekstringAll <- seq(as.Date(range(na.omit(pamdata$formatdate))[1]), to=as.Date(range(na.omit(pamdata$formatdate))[2]), by='1 week')
+
+#Create a vector that lists each day in the TOTAL time period (earliest and latest date from any MARU and sheet)
+DaystringAll <- seq(as.Date(range(na.omit(pamdata$formatdate))[1]), to=as.Date(range(na.omit(pamdata$formatdate))[2]), by='1 day')
+
+#Turn vector of week start days into data table
+WeekstringTabAll <- as.data.frame(WeekstringAll)
+
+#Expand data table of week start days to show the start day of each week 7 times
+WeekstringTab2All <- WeekstringTabAll[rep(seq_len(nrow(WeekstringTabAll)), each=7),]
+
+#make a new vector of weeks start days that is shortened to represent length of actual time period
+WeekColumnAll <- WeekstringTab2All[1:length(DaystringAll)]
+
+#make vector into data frame
+WeekColumnAll <- as.data.frame(WeekColumnAll)
+
+#Make a column in week start day data frame that lists date alonside week start days
+WeekColumnAll$formatdate <- seq(as.Date(range(na.omit(pamdata$formatdate))[1]), to=as.Date(range(na.omit(pamdata$formatdate))[2]), by='1 day')
+
+#Rename Week start day data frame to "Week"
+Week <- WeekColumnAll
+
+#Make a column in "Week" that lists days numically, with 1 being the overall start date
+Week$Day <-seq(1:length(DaystringAll))
+
+#Make function to merge week start data frame with the output of "ParseByChannel"
+MakeMergedFrames <- function(x) {
+  MergedFrames <- merge(ParseByChannel(x), Week, all = TRUE)
+  MergedFrames
+}
+
+
+#Make a function that produces a tapply output that has true detections binned by week start for each MARU 
+MakeRECBin <- function(x) {
+  RECBin <- tapply(MakeMergedFrames(x)$True_Presence_Days1, list(MakeMergedFrames(x)$Week), sum, na.rm = TRUE)
+  RECBin
+}
+
+
+#plot the output of the previous tapply function. This is one place to mess with how the graphs look. 
+Makeplot <- function(x) {
+  plot1 <- barplot(MakeRECBin(x), ylim=c(0,7), main=paste("MARU",x), xaxt='n', border=TRUE, col="gray40", xaxs = "i",cex.axis=1,space=0)
+  abline(h=0) 
+  if (length(Week$Day) < 730){
+    Axis(side=1, at=plot1, labels=FALSE, tck=-.015)
+  }
+}
+
+#extra plotting function that is used to calculate plotcorrection factor
+Makeplot2 <- function(x) {
+  plot1 <- barplot(MakeRECBin(x), ylim=c(0,7), main=paste("MARU",x), xaxt='n', border=NA, col="darkblue", xaxs = "i",space=0)
+  abline(h=0) 
+  Axis(side=1, at=plot1, labels=FALSE, tck=-.01)
+}
+
+#make a plotting correction factor that in the form of: plot distance/day 
+plotcorrection <- (Makeplot2(1)[2]-Makeplot2(1)[1])/7
+
+#generate a vector that lists all the 1st days of each month that are present in the total time period
+Monthstring <- seq(as.Date(cut(Week$formatdate[1], "1 month"), n=1), to=as.Date(tail(Week$formatdate, n=1)), by='1 month')
+
+#Make a data frame out of previous output that includes other variables from the "Week" data frame
+Monthdata <- Week[Week$formatdate %in% c(Monthstring),]
+
+#Make a new column in the dataframe called "Month", which lists the abbreviated month name
+Monthdata$Month <- format(Monthdata$formatdate,'%b')
+
+#Vector of these values
+Monthlist <- Monthdata$Month
+
+#Make vector of month names into characters. Used for x axis labels later
+CharacterMonthlist <- as.character(Monthlist)
+
+#Vector of which # day (with 1 being the start of the time period) each month starts on
+Monthstartdaylist <- Monthdata$Day
+
+#Vector of where to plot the month starts
+Monthstring_At <- Monthstartdaylist*plotcorrection
+
+#For long timespans (>2 years), will show years instead of months
+Week$Year <- format(Week$formatdate,'%y')
+
+
+#generate a vector that lists all the 1st days of each year that are present in the total time period
+Yearstring <- seq(as.Date(cut(Week$formatdate[1], "1 year"), n=1), to=as.Date(tail(Week$formatdate, n=1)), by='1 year')
+
+#Make a data frame out of previous output that includes other variables from the "Week" data frame
+Yeardata <- Week[Week$formatdate %in% c(Yearstring),]
+
+#Make a new column in the dataframe called "Month", which lists the abbreviated month name
+Yeardata$Year <- format(Yeardata$formatdate,'%Y')
+
+#Vector of these values
+Yearlist <- Yeardata$Year
+
+#Make vector of year names into characters. Used for year labels on x axis later.
+CharacterYearlist <- as.character(Yearlist)
+
+#Vector of which # day (with 1 being the start of the time period) each month starts on
+Yearstartdaylist <- Yeardata$Day
+
+#Vector of where to plot the month starts
+Yearstring_At <- Yearstartdaylist*plotcorrection
+
+#function to make new column that takes NA chunks (periods of no recorder effort) and turns them into a number in a new column
+MakeNAColumn <- function(x) {
+  MergedFrames <- MakeMergedFrames(x)
+  MergedFrames$NAColumn <- is.na(MergedFrames$True_Presence_Days1)
+  as.character(MergedFrames$NAColumn)
+  MergedFrames$NAColumn[MergedFrames$NAColumn == "FALSE"] <- "0"
+  MergedFrames$NAColumn[MergedFrames$NAColumn == "TRUE"] <- "1"
+  MergedFrames
+}  
+
+
+#function that makes new data frame with only NA rows
+MakeNAData <- function(x) {
+  NAData <- MakeNAColumn(x)[MakeNAColumn(x)$NAColumn %in% 1, ]
+  NAData
+}
+
+#function that makes vector out of day column that coincides with NAs
+MakeNADayVector <- function(x) {
+  NADayVector <- as.vector(MakeNAData(x)$Day)
+  NADayVector
+}
+
+
+#function that adjusts NA day vector by appropriate ploting distance
+MakeCorrectNADay <- function(x) {
+  CorrectNADay <- MakeNADayVector(x)*plotcorrection
+  CorrectNADay
+}
+
+#function that makes left bound for each day
+MakeCorrectNADaylb <- function(x) {
+  CorrectNADaylb <-MakeCorrectNADay(x)-(plotcorrection/2)
+  CorrectNADaylb
+}
+
+
+#function that makes right bound for each day
+MakeCorrectNADayrb <- function(x) {
+  CorrectNADayrb <-MakeCorrectNADay(x)+(plotcorrection/2)
+  CorrectNADayrb
+}
+
+#function that plots true detections by week, and gives an extra set of tickmarks to show month start
+MakeplotAll <- function(x) {
+  Makeplot(x)
+  axis(1,at=c(Monthstring_At),labels=FALSE, pos=0, line=NA, tick=TRUE,las=1)
+  if (length(Week$Day) > 730) {
+    axis(1,at=c(Yearstring_At),labels=FALSE, pos=0, line=NA, tick=TRUE,las=1,tck=-.03)
+  }
+}
+
+#Vector of total number of MARUs 
+CH.nums <- sort(unique(pamdata$CH))
+
+#################SECTION4##################
+#Run par(...), and then choose if you want to make plots automatically or manually. If you want to arrange plots differently than top-down 1 wide, you may want to add plots manually so you can add additional axes (which can be added to current (last) plot in Section5).
+
+#Set parameters for multiple plots. Defaults to top down arrangement, can be changed by modifying mfrow. oma, mar, mgp change the size of the borders between and around the plots. 
+par(mfrow=c(length(CH.nums),1), oma = c(3,6,1,2)+0.2, mar = c(.5,.5,1,1)+0.1, mgp = c(2,1,0),las=2, cex.main=1.2, cex.axis=1.2)
+
+#-------------------------------------------
+#For loop that makes the plots
+for(n in CH.nums) {
+  MakeplotAll(n)
+  if (1 %in% MakeNAData(n)$NAColumn) {rect(MakeCorrectNADaylb(n),1,MakeCorrectNADayrb(n),1.5, border=NA, col='chocolate1') 
+  }
+}
+
+
+
+#------------------------------------------- RUN CODE TILL HERE FOR AUTOMATIC HISTOGRAMS: JUMP TO SECTION 5 for axes labels--------------------------------
+
+#OR 
+
+#-------------------------------------------
+#Make plots manually (assuming 6 plots)
+MakeplotAll(1)
+if (1 %in% MakeNAData(1)$NAColumn) {rect(MakeCorrectNADaylb(1),1,MakeCorrectNADayrb(1),1.5, border=NA, col='chocolate1')}
+MakeplotAll(2)
+if (1 %in% MakeNAData(2)$NAColumn) {rect(MakeCorrectNADaylb(2),1,MakeCorrectNADayrb(2),1.5, border=NA, col='chocolate1')}
+MakeplotAll(3)
+if (1 %in% MakeNAData(3)$NAColumn) {rect(MakeCorrectNADaylb(3),1,MakeCorrectNADayrb(3),1.5, border=NA, col='chocolate1')}
+MakeplotAll(4)
+if (1 %in% MakeNAData(4)$NAColumn) {rect(MakeCorrectNADaylb(4),1,MakeCorrectNADayrb(4),1.5, border=NA, col='chocolate1')}
+MakeplotAll(5)
+if (1 %in% MakeNAData(5)$NAColumn) {rect(MakeCorrectNADaylb(5),1,MakeCorrectNADayrb(5),1.5, border=NA, col='chocolate1')}
+MakeplotAll(6)
+if (1 %in% MakeNAData(6)$NAColumn) {rect(MakeCorrectNADaylb(6),1,MakeCorrectNADayrb(6),1.5, border=NA, col='chocolate1')}
+#-------------------------------------------
+
+#################SECTION5##################
+#Insert axis labels for the last graph plotted. Tweak cex and pos to make graphs look greaaaat.
+
+#Draw x axis labels for the months
+axis(1,at=c(Monthstring_At),labels=c(CharacterMonthlist), outer=TRUE, pos=1, line=NA, tick=FALSE, las=1, cex.axis=1)
+
+#Draw x axis labels for the years
+axis(1,at=c(Yearstring_At),labels=c(CharacterYearlist), outer=TRUE, pos=-0.4, line=NA, tick=FALSE, las=1, cex.axis=1.2)
+
+#Draw y axis label
+title( ylab = expression("Number of days with"~presence^{"- week"}), outer=TRUE, line=3, cex.lab=2.5)
+
+#################EXTRA ANALYSIS SECTION##################
+
+#OTHER GRAPHS
+
+#how many detection days per recorder
+MARUDETplot <- tapply(pamdata$True_Presence_Days1, list(pamdata$CH), sum, simplify=TRUE)
+
+barplot(MARUDETplot, border=NA, xlab= "MARU number", ylab = "True detection days", cex.lab=1.2)
+abline(h=0) 
+
+#how many detection days per month (all recorders)
+
+pamdata$Month <- factor(pamdata$Month, levels = c(Monthlist))
+MONTHDETplot <- tapply(pamdata$True_Presence_Days1, list(pamdata$Month), sum, simplify=TRUE)
+
+if (length(Monthlist) > 12)
+{MONTHDETplot <- MONTHDETplot[1:12]}
+
+barplot(MONTHDETplot, border=NA, xlab= "Month", ylab = "True detection days", ylim=c(0,60), cex.lab=1.2)
+abline(h=0) 
+
+#how many detection days, detection day rate, and days per season
+
+SEASONDETplot <- tapply(pamdata$True_Presence_Days1, list(pamdata$Season), sum, simplify=TRUE, na.rm=TRUE)
+
+barplot(SEASONDETplot, border=NA, xlab= "Season", ylab = "Count of true detection days", ylim=c(0,250), cex.lab=1.2)
+abline(h=0) 
+
+SEASONDETAVplot <- tapply(pamdata$True_Presence_Days1, list(pamdata$Season), mean, simplify=TRUE, na.rm=TRUE)
+
+barplot(SEASONDETAVplot, border=NA, xlab= "Season", ylab = "True detection day rate", ylim=c(0,0.2), cex.lab=1.2)
+text(.72,(.13960703+.005),"n=967")
+text(1.92,(0.18219634+.005),"n=1202")
+text(3.12,(0.06872247+.005),"n=1135")
+text(4.32,(0.01293661+.005),"n=773")
+abline(h=0) 
+
+SEASONDETAVplotsd <- tapply(pamdata$True_Presence_Days1, list(pamdata$Season), sd, simplify=TRUE, na.rm=TRUE)
+
+Fall_n <- sum(pamdata$Season == "Fall",na.rm=TRUE)
+Winter_n <- sum(pamdata$Season == "Winter",na.rm=TRUE)
+Spring_n <- sum(pamdata$Season == "Spring",na.rm=TRUE)
+Summer_n <- sum(pamdata$Season == "Summer",na.rm=TRUE)
+
+
+SEASONDaysplot <- tapply(pamdata$DaysAs1, list(pamdata$Season), sum, simplify=TRUE, na.rm=TRUE)
+
+barplot(SEASONDaysplot, border=NA, xlab= "Season", ylab = "Count of days", cex.lab=1.2)
+abline(h=0) 
+
+#mapping
+pamdata$Month_Year <- format(pamdata$formatdate,'%b %y')
+
+monthcounts <- as.data.frame(tapply(pamdata$True_Presence_Days1, list(pamdata$Month_Year, pamdata$CH), sum, na.rm=TRUE))
+t(monthcounts)
+?tapply()
+
+View(pamdata)
+# total days in period
+length(DaystringAll)
+
+
+#stuff for making a plot for BRP_MARI presentation 
+
+mypathSeason_bar <- file.path("/Users/danielwoodrich/Desktop/Research Projects/Right whale migratory corridor project/Plots for 20151123 presentation/Season_bar.jpg")
+
+jpeg(mypathSeason_bar,width=10,height=7.48,units="in",res=300)
+
+barplot(SEASONDETAVplot, border=NA, xlab= "Season", ylab = "True detection day rate", ylim=c(0,0.2), cex.lab=1.2)
+text(.72,(.13960703+.005),"n=967")
+text(1.92,(0.18219634+.005),"n=1202")
+text(3.12,(0.06872247+.005),"n=1135")
+text(4.32,(0.01293661+.005),"n=773")
+abline(h=0) 
+
+
+
+dev.off()
+#optional plotting vector (used for BRP_MARI)
+plotvec <- c(9,8,7,1,2,3,4,5,6)
