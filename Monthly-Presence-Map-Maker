@@ -1,10 +1,12 @@
 #Dummy dataset for download: https://www.dropbox.com/s/1geufxy0oh53s1v/Map_script_DUMMY.csv?dl=0
 
+#Manually enter desired file to save maps in (full path, in quotation marks):
+path_Monthly_Pres_maps <- 
+path_Recorder_Loc_map <- 
+
 require("ggmap")
 require("qmap")
 require("ggplot2")
-#Helpful info:
-#https://www.nceas.ucsb.edu/~frazier/RSpatialGuides/ggmap/ggmapCheatsheet.pdf
 
 #Preprocessing
 Recorderpos <- read.csv(file.choose())
@@ -32,7 +34,7 @@ map1 <-ggmap(map)
 #Loop to make maps
 
 for(i in 1:27) {
-  mypath <- file.path("/Users/danielwoodrich/Desktop/Research Projects/Right whale migratory corridor project/WWU presentation/Plots for 20151123 presentation",paste(i,".jpg",sep=""))
+  mypath <- file.path(path_Monthly_Pres_maps,paste(i,".jpg",sep=""))
   
   Detection_days_per_month <- as.vector(t(Recorderpos[i+4]))
   Recording_status <- as.vector(t(ActiveInactive[i+4]))
@@ -51,7 +53,7 @@ for(i in 1:27) {
   dev.off()
 }
 
-#map that shows recorder # 
+#map that shows recorder # and location
 
 cmap<-get_map(location=c(-70.404834,41.250462),zoom=8,source ="google",maptype='hybrid',color="color")
 cmap1 <-ggmap(cmap)
@@ -61,7 +63,7 @@ Coord_map1<-cmap1+geom_point(aes(x=Longitude_W, y=Latitude_N), color='purple',si
 Coord_map2 <- Coord_map1 + geom_point(aes(x=Longitude_W, y=Latitude_N), color='purple',size=15, alpha = .3,data=Recorderpos)
 Coord_map3 <- Coord_map2 + geom_text(data=Recorderpos,aes(x=Recorderpos$Longitude_W, y=Recorderpos$Latitude_N),label=Recorderpos$CH, color='white') + theme(axis.title = element_blank()) 
 
-mypathcoordmap <- file.path("/Users/danielwoodrich/Desktop/Research Projects/Right whale migratory corridor project/WWU presentation/Plots for 20151123 presentation","Coordmap.jpg")
+mypathcoordmap <- file.path(path_Recorder_Loc_map,"Coordmap.jpg")
 
 jpeg(mypathcoordmap,width=10,height=7.48,units="in",res=300)
 print(Coord_map3)
