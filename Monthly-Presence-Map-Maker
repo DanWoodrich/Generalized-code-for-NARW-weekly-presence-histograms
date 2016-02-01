@@ -1,8 +1,9 @@
+#Dummy dataset for download: https://www.dropbox.com/s/1geufxy0oh53s1v/Map_script_DUMMY.csv?dl=0
 
 require("ggmap")
 require("qmap")
 require("ggplot2")
-#map library: it also exists!
+#Helpful info:
 #https://www.nceas.ucsb.edu/~frazier/RSpatialGuides/ggmap/ggmapCheatsheet.pdf
 
 #Preprocessing
